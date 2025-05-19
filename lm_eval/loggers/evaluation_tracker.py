@@ -16,7 +16,11 @@ from huggingface_hub import (
     HfApi,
     hf_hub_url,
 )
-from huggingface_hub.utils import build_hf_headers, get_session, hf_raise_for_status
+from huggingface_hub.utils import (
+    build_hf_headers,
+    get_session,
+    hf_raise_for_status,
+)
 
 from lm_eval.utils import (
     get_file_datetime,
@@ -74,7 +78,14 @@ class GeneralConfigTracker:
             return args_after_key.split(",")[0]
 
         # order does matter, e.g. peft and delta are provided together with pretrained
-        prefixes = ["peft=", "delta=", "pretrained=", "model=", "path=", "engine="]
+        prefixes = [
+            "peft=",
+            "delta=",
+            "pretrained=",
+            "model=",
+            "path=",
+            "engine=",
+        ]
         for prefix in prefixes:
             if prefix in model_args:
                 return extract_model_name(model_args, prefix)
@@ -97,13 +108,17 @@ class GeneralConfigTracker:
             hash_string(system_instruction) if system_instruction else None
         )
         self.chat_template = chat_template
-        self.chat_template_sha = hash_string(chat_template) if chat_template else None
+        self.chat_template_sha = (
+            hash_string(chat_template) if chat_template else None
+        )
         self.fewshot_as_multiturn = fewshot_as_multiturn
 
     def log_end_time(self) -> None:
         """Logs the end time of the evaluation and calculates the total evaluation time."""
         self.end_time = time.perf_counter()
-        self.total_evaluation_time_seconds = str(self.end_time - self.start_time)
+        self.total_evaluation_time_seconds = str(
+            self.end_time - self.start_time
+        )
 
 
 class EvaluationTracker:
@@ -173,10 +188,14 @@ class EvaluationTracker:
 
         if hub_repo_name == "":
             details_repo_name = (
-                details_repo_name if details_repo_name != "" else "lm-eval-results"
+                details_repo_name
+                if details_repo_name != ""
+                else "lm-eval-results"
             )
             results_repo_name = (
-                results_repo_name if results_repo_name != "" else details_repo_name
+                results_repo_name
+                if results_repo_name != ""
+                else details_repo_name
             )
         else:
             details_repo_name = hub_repo_name
@@ -186,9 +205,13 @@ class EvaluationTracker:
             )
 
         self.details_repo = f"{hub_results_org}/{details_repo_name}"
-        self.details_repo_private = f"{hub_results_org}/{details_repo_name}-private"
+        self.details_repo_private = (
+            f"{hub_results_org}/{details_repo_name}-private"
+        )
         self.results_repo = f"{hub_results_org}/{results_repo_name}"
-        self.results_repo_private = f"{hub_results_org}/{results_repo_name}-private"
+        self.results_repo_private = (
+            f"{hub_results_org}/{results_repo_name}-private"
+        )
 
     def save_results_aggregated(
         self,
@@ -216,7 +239,9 @@ class EvaluationTracker:
                             s["doc_hash"] + s["prompt_hash"] + s["target_hash"]
                             for s in task_samples
                         ]
-                        task_hashes[task_name] = hash_string("".join(sample_hashes))
+                        task_hashes[task_name] = hash_string(
+                            "".join(sample_hashes)
+                        )
 
                 # update initial results dict
                 results.update({"task_hashes": task_hashes})
@@ -228,13 +253,20 @@ class EvaluationTracker:
                     ensure_ascii=False,
                 )
 
-                path = Path(self.output_path if self.output_path else Path.cwd())
-                path = path.joinpath(self.general_config_tracker.model_name_sanitized)
+                path = Path(
+                    self.output_path if self.output_path else Path.cwd()
+                )
+                if self.general_config_tracker.model_name_sanitized:
+                    path = path.joinpath(
+                        self.general_config_tracker.model_name_sanitized
+                    )
                 path.mkdir(parents=True, exist_ok=True)
 
                 self.date_id = datetime.now().isoformat().replace(":", "-")
-                file_results_aggregated = path.joinpath(f"results_{self.date_id}.json")
-                file_results_aggregated.open("w", encoding="utf-8").write(dumped)
+                file_results_aggregated = path.joinpath("results.json")
+                file_results_aggregated.open("w", encoding="utf-8").write(
+                    dumped
+                )
 
                 if self.api and self.push_results_to_hub:
                     repo_id = (
@@ -289,12 +321,17 @@ class EvaluationTracker:
             try:
                 eval_logger.info(f"Saving per-sample results for: {task_name}")
 
-                path = Path(self.output_path if self.output_path else Path.cwd())
-                path = path.joinpath(self.general_config_tracker.model_name_sanitized)
+                path = Path(
+                    self.output_path if self.output_path else Path.cwd()
+                )
+                if self.general_config_tracker.model_name_sanitized:
+                    path = path.joinpath(
+                        self.general_config_tracker.model_name_sanitized
+                    )
                 path.mkdir(parents=True, exist_ok=True)
 
                 file_results_samples = path.joinpath(
-                    f"samples_{task_name}_{self.date_id}.jsonl"
+                    f"samples_{task_name}.jsonl"
                 )
 
                 for sample in samples:
@@ -308,7 +345,9 @@ class EvaluationTracker:
                             arguments[f"gen_args_{i}"][f"arg_{j}"] = tmp
 
                     sample["resps"] = sanitize_list(sample["resps"])
-                    sample["filtered_resps"] = sanitize_list(sample["filtered_resps"])
+                    sample["filtered_resps"] = sanitize_list(
+                        sample["filtered_resps"]
+                    )
                     sample["arguments"] = arguments
                     sample["target"] = str(sample["target"])
 
@@ -321,7 +360,9 @@ class EvaluationTracker:
                         + "\n"
                     )
 
-                    with open(file_results_samples, "a", encoding="utf-8") as f:
+                    with open(
+                        file_results_samples, "a", encoding="utf-8"
+                    ) as f:
                         f.write(sample_dump)
 
                 if self.api and self.push_samples_to_hub:
@@ -364,7 +405,9 @@ class EvaluationTracker:
                 eval_logger.warning("Could not save sample results")
                 eval_logger.info(repr(e))
         else:
-            eval_logger.info("Output path not provided, skipping saving sample results")
+            eval_logger.info(
+                "Output path not provided, skipping saving sample results"
+            )
 
     def recreate_metadata_card(self) -> None:
         """
@@ -372,9 +415,15 @@ class EvaluationTracker:
         """
 
         eval_logger.info("Recreating metadata card")
-        repo_id = self.details_repo if self.public_repo else self.details_repo_private
+        repo_id = (
+            self.details_repo
+            if self.public_repo
+            else self.details_repo_private
+        )
 
-        files_in_repo = self.api.list_repo_files(repo_id=repo_id, repo_type="dataset")
+        files_in_repo = self.api.list_repo_files(
+            repo_id=repo_id, repo_type="dataset"
+        )
         results_files = get_results_filenames(files_in_repo)
         sample_files = get_sample_results_filenames(files_in_repo)
 
@@ -386,7 +435,9 @@ class EvaluationTracker:
         #     "org__model_name__ifeval": "2021-09-01T12:00:00",
         #     "org__model_name__results": "2021-09-01T12:00:00"
         # }
-        latest_task_results_datetime = defaultdict(lambda: datetime.min.isoformat())
+        latest_task_results_datetime = defaultdict(
+            lambda: datetime.min.isoformat()
+        )
 
         for file_path in sample_files:
             file_path = Path(file_path)
@@ -426,9 +477,14 @@ class EvaluationTracker:
 
             if eval_date_sanitized == sanitized_last_eval_date_results:
                 # Ensure that all results files are listed in the metadata card
-                current_results = card_metadata.get(config_name, {"data_files": []})
+                current_results = card_metadata.get(
+                    config_name, {"data_files": []}
+                )
                 current_results["data_files"].append(
-                    {"split": eval_date_sanitized, "path": [str(results_filename)]}
+                    {
+                        "split": eval_date_sanitized,
+                        "path": [str(results_filename)],
+                    }
                 )
                 card_metadata[config_name] = current_results
                 # If the results file is the newest, update the "latest" field in the metadata card
@@ -456,7 +512,10 @@ class EvaluationTracker:
                     config_name, {"data_files": []}
                 )
                 current_details_for_task["data_files"].append(
-                    {"split": eval_date_sanitized, "path": [str(results_filename)]}
+                    {
+                        "split": eval_date_sanitized,
+                        "path": [str(results_filename)],
+                    }
                 )
                 card_metadata[config_name] = current_details_for_task
                 # If the samples results file is the newest, update the "latest" field in the metadata card
@@ -467,7 +526,8 @@ class EvaluationTracker:
         # Get latest results and extract info to update metadata card examples
         latest_datetime = max(latest_task_results_datetime.values())
         latest_model_name = max(
-            latest_task_results_datetime, key=lambda k: latest_task_results_datetime[k]
+            latest_task_results_datetime,
+            key=lambda k: latest_task_results_datetime[k],
         )
         last_results_file = [
             f for f in results_files if latest_datetime.replace(":", "-") in f

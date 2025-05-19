@@ -145,7 +145,9 @@ class LM(abc.ABC):
         Returns:
         - Instance of the LM class.
         """
-        additional_config = {} if additional_config is None else additional_config
+        additional_config = (
+            {} if additional_config is None else additional_config
+        )
         args = utils.simple_parse_args_string(arg_string)
         args2 = {k: v for k, v in additional_config.items() if v is not None}
         return cls(**args, **args2)
@@ -165,7 +167,9 @@ class LM(abc.ABC):
         - Instance of the LM class.
         """
 
-        additional_config = {} if additional_config is None else additional_config
+        additional_config = (
+            {} if additional_config is None else additional_config
+        )
         additional_config = {
             k: v for k, v in additional_config.items() if v is not None
         }
@@ -196,7 +200,9 @@ class LM(abc.ABC):
             "To use this model with chat templates, please implement the 'tokenizer_name' property."
         )
 
-    def chat_template(self, chat_template: Union[bool, str] = False) -> Optional[str]:
+    def chat_template(
+        self, chat_template: Union[bool, str] = False
+    ) -> Optional[str]:
         """Returns the chat template structure for user/assistant messages if a template is provided.
         This method is intended to be overridden in a subclass to define a specific chat template format.
         For models that do not support chat templates, this method returns None by default.
@@ -249,8 +255,14 @@ class CachingLM:
 
     def __getattr__(self, attr: str):
         lm_attr = getattr(self.lm, attr)
-        if attr not in ["loglikelihood", "loglikelihood_rolling", "generate_until"]:
-            eval_logger.debug(f"Passing through attribute '{attr}' to underlying LM")
+        if attr not in [
+            "loglikelihood",
+            "loglikelihood_rolling",
+            "generate_until",
+        ]:
+            eval_logger.debug(
+                f"Passing through attribute '{attr}' to underlying LM"
+            )
             return lm_attr
 
         def fn(requests):
@@ -263,7 +275,9 @@ class CachingLM:
             )
             for req in tqdm(requests, desc="Checking cached requests"):
                 hsh = hash_args(attr, req.args)
-                if attr == "generate_until" and req.args[1].get("do_sample", False):
+                if attr == "generate_until" and req.args[1].get(
+                    "do_sample", False
+                ):
                     # when we are doing non-greedy generation, don't use the cache
                     # (else every "randomly sampled" generation would be identical for repeats > 1).
                     if not warned:
@@ -338,7 +352,9 @@ class TemplateLM(LM):
         pass
 
     @abc.abstractmethod
-    def _loglikelihood_tokens(self, requests, **kwargs) -> List[Tuple[float, bool]]:
+    def _loglikelihood_tokens(
+        self, requests, **kwargs
+    ) -> List[Tuple[float, bool]]:
         pass
 
     def _encode_pair(
@@ -353,7 +369,9 @@ class TemplateLM(LM):
 
         if model_class == transformers.AutoModelForSeq2SeqLM:
             context_enc = self.tok_encode(context)
-            continuation_enc = self.tok_encode(continuation, add_special_tokens=False)
+            continuation_enc = self.tok_encode(
+                continuation, add_special_tokens=False
+            )
         else:
             whole_enc = self.tok_encode(context + continuation)
             context_enc = self.tok_encode(context)
@@ -375,9 +393,13 @@ class TemplateLM(LM):
                     self.tok_encode(continuation),
                 )
             else:
-                context_enc, continuation_enc = self._encode_pair(context, continuation)
+                context_enc, continuation_enc = self._encode_pair(
+                    context, continuation
+                )
 
-            new_reqs.append(((context, continuation), context_enc, continuation_enc))
+            new_reqs.append(
+                ((context, continuation), context_enc, continuation_enc)
+            )
 
         return self._loglikelihood_tokens(new_reqs, disable_tqdm=disable_tqdm)
 
@@ -388,10 +410,14 @@ class TemplateLM(LM):
         pass
 
     @abc.abstractmethod
-    def generate_until(self, requests, disable_tqdm: bool = False) -> List[str]:
+    def generate_until(
+        self, requests, disable_tqdm: bool = False
+    ) -> List[str]:
         pass
 
-    def chat_template(self, chat_template: Union[bool, str] = False) -> Optional[str]:
+    def chat_template(
+        self, chat_template: Union[bool, str] = False
+    ) -> Optional[str]:
         """
         Set and get the appropriate chat template for the model.
         This method sets the tokenizer's chat_template and returns the template string for reproducibility.
@@ -437,7 +463,8 @@ class TemplateLM(LM):
         # First, handle the cases when the model has a dict of multiple templates
         try:
             template = (
-                self.tokenizer.chat_template or self.tokenizer.default_chat_template
+                self.tokenizer.chat_template
+                or self.tokenizer.default_chat_template
             )
         except AttributeError:
             return None
