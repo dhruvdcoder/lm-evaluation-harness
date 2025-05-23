@@ -55,6 +55,30 @@ filter_list:
     regex_pattern: (-?[$0-9.,]{2,})|(-?[0-9]+)
   - function: take_first
   name: top1-flexible-extract
+- filter:
+  - function: regex
+    regex_pattern: The answer is (\-?[0-9\.\,]+).
+  - function: take_first_k
+    k: 10
+  name: top10-strict-match
+- filter:
+  - function: regex
+    regex_pattern: The answer is (\-?[0-9\.\,]+).
+  - function: take_first_k
+    k: 30
+  name: top30-strict-match
+- filter:
+  - function: regex
+    regex_pattern: The answer is (\-?[0-9\.\,]+).
+  - function: take_first_k
+    k: 60
+  name: top60-strict-match
+- filter:
+  - function: regex
+    regex_pattern: The answer is (\-?[0-9\.\,]+).
+  - function: take_first_k
+    k: 100
+  name: top100-strict-match
 generation_kwargs:
   do_sample: false
   until:
@@ -70,7 +94,7 @@ metric_list:
   higher_is_better: true
   ignore_case: true
   ignore_punctuation: false
-  metric: exact_match
+  metric: exact_match_coverage
   regexes_to_ignore:
   - ','
   - \$
@@ -79,5 +103,5 @@ metric_list:
 num_fewshot: 8
 output_type: generate_until
 repeats: 1
-task: gsm8k_cot
+task: gsm8k_cot_topk
 test_split: test

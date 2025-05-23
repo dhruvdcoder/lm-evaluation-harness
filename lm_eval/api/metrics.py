@@ -194,7 +194,7 @@ def acc_mutual_info_fn(items):  # This is a passthrough function
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-def exact_match_hf_evaluate(
+def exact_match_hf_evaluate_core(
     predictions,
     references,
     regexes_to_ignore=None,
@@ -226,7 +226,51 @@ def exact_match_hf_evaluate(
 
     score_list = predictions == references
 
+    return score_list
+
+
+def exact_match_hf_evaluate(
+    predictions,
+    references,
+    regexes_to_ignore=None,
+    ignore_case=False,
+    ignore_punctuation=False,
+    ignore_numbers=False,
+):
+
+    score_list = exact_match_hf_evaluate_core(
+        predictions,
+        references,
+        regexes_to_ignore,
+        ignore_case,
+        ignore_punctuation,
+        ignore_numbers,
+    )
     return {"exact_match": np.mean(score_list)}
+
+
+def exact_match_hf_evaluate_coverage(
+    predictions,
+    references,
+    regexes_to_ignore=None,
+    ignore_case=False,
+    ignore_punctuation=False,
+    ignore_numbers=False,
+):
+    # if predictions are a list of lists, we need to flatten them
+    if isinstance(predictions, list) and isinstance(predictions[0], list):
+        predictions = [item for sublist in predictions for item in sublist]
+    if isinstance(references, list) and isinstance(references[0], list):
+        references = [item for sublist in references for item in sublist]
+    score_list = exact_match_hf_evaluate_core(
+        predictions,
+        references,
+        regexes_to_ignore,
+        ignore_case,
+        ignore_punctuation,
+        ignore_numbers,
+    )
+    return {"exact_match_coverage": np.max(score_list).astype(float)}
 
 
 ###
@@ -240,6 +284,16 @@ def exact_match_hf_evaluate(
 )
 def exact_match_fn(**kwargs):
     return exact_match_hf_evaluate(**kwargs)
+
+
+@register_metric(
+    metric="exact_match_coverage",
+    higher_is_better=True,
+    output_type="generate_until",
+    aggregation="mean",
+)
+def exact_match_coverage_fn(**kwargs):
+    return exact_match_hf_evaluate_coverage(**kwargs)
 
 
 @register_metric(
@@ -376,7 +430,9 @@ def acc_all(items):
 
         gold_label = doc["label"] == 1
 
-        question_scoring_dict[(paragraph_id, question_id)].append(gold_label == pred)
+        question_scoring_dict[(paragraph_id, question_id)].append(
+            gold_label == pred
+        )
     acc = np.mean([int(all(x)) for x in question_scoring_dict.values()])
     return acc
 
@@ -528,16 +584,23 @@ def pooled_sample_stderr(stderrs: List[float], sizes: List[int]):
     # this empirically seems to match running `stderr_for_metric` on all instances
     # from the subtasks concatenated with each other.
     pooled_sample_var = (
-        sum([(size - 1) * stderr**2 * size for size, stderr in zip(sizes, stderrs)])
+        sum(
+            [
+                (size - 1) * stderr**2 * size
+                for size, stderr in zip(sizes, stderrs)
+            ]
+        )
     ) / (sum(sizes) - len(sizes))
 
     return np.sqrt(pooled_sample_var / sum(sizes))
 
 
-def combined_sample_stderr(stderrs: List[float], sizes: List[int], metrics=None):
-    assert metrics is not None, (
-        "Need to pass a list of each subtask's metric for this stderr aggregation"
-    )
+def combined_sample_stderr(
+    stderrs: List[float], sizes: List[int], metrics=None
+):
+    assert (
+        metrics is not None
+    ), "Need to pass a list of each subtask's metric for this stderr aggregation"
     assert len(stderrs) == len(sizes) and len(sizes) == len(metrics)
 
     # See https://github.com/EleutherAI/lm-evaluation-harness/pull/1390 for more documentation.
@@ -557,9 +620,11 @@ def combined_sample_stderr(stderrs: List[float], sizes: List[int], metrics=None)
             curr_size + size
         )  # NOTE: this assumes our aggregation fn is "mean"
 
-        variance = ((curr_size - 1) * variance + (size - 1) * (stderr**2)) / (
-            curr_size + size - 1
-        ) + curr_size * size / ((curr_size + size) * (curr_size + size - 1)) * (
+        variance = (
+            (curr_size - 1) * variance + (size - 1) * (stderr**2)
+        ) / (curr_size + size - 1) + curr_size * size / (
+            (curr_size + size) * (curr_size + size - 1)
+        ) * (
             curr_score - score
         ) ** 2
 
@@ -575,4 +640,6 @@ def aggregate_subtask_metrics(metrics, sizes, weight_by_size=True):
 
     assert len(metrics) == len(sizes)
 
-    return sum([metric * size for metric, size in zip(metrics, sizes)]) / sum(sizes)
+    return sum([metric * size for metric, size in zip(metrics, sizes)]) / sum(
+        sizes
+    )
